@@ -312,4 +312,85 @@ void RedBlack<T>::solveDoubleRed(BinNode<T> *x)  //解决双红问题
 }
 
 //双黑修正
-//template<typename T>
+/******************************************************************
+ * RedBlack双黑调整算法:解决节点s与被其替代的节点皆为黑色的问题
+ * 分为三大类四种情况：
+ * BB-1（黑s有红子t）:2次颜色翻转，2次黑高度更新，1-2次旋转，不再递归
+ * BB-2R（黑s无红子，p红）:2次颜色翻转，2次黑高度更新，1-2次旋转，不再递归
+ * BB-2B（黑s有红子，p黑）:1次颜色翻转，1次黑高度跟新，0次旋转，需要递归
+ * BB-3（红s）:2次颜色翻转，2次黑高度更新，1次旋转，转为BB-1或BB-2R
+ *******************************************************************/
+template<typename T>
+void RedBlack<T>::solveDoubleBlack(BinNode<T> *r)
+{
+    BinNodePosi(T) p=r?r->parent:_hot; //why? //r的父亲
+    BinNodePosi(T) s=(r==p->lc)?p->rc:p->lc; //r的兄弟
+    if(IsBlack(s)) //如果兄弟是黑色的
+    {
+       BinNodePosi(T) t=NULL; //s的红孩子，若左右孩子皆为红色，左孩子优先；如果都是黑色的，则为NULL
+       if(IsRed(s->rc)) t=s->rc;
+       if(IsRed(s->lc)) t=s->lc;
+       if(t) //如果黑s有红孩子，BB-1
+       {
+           //t变黑，p变黑，s变为p的颜色
+           RBColor OldColor=p->color;
+           //通过旋转重平衡，并将新子树的左右孩子都染成黑色
+           BinNodePosi(T) b=FromParentTo(*p)=rotateAt(t);
+           if(HasLChild(*p)) {p->lc->color=RB_BLACK;updateHeight(p->lc);}
+           if(HasRChild(*p)) {p->rc->color=RB_BLACK;updateHeight(p->rc);}
+           b->color=OldColor; updateHeight(b);
+       }
+       else //如果黑s没有红孩子
+       {
+           s->color=RB_RED; //s都是转为红色
+           if(IsRed(p))  //如果p是红色的，BB-2R
+           {
+               p->color=RB_BLACK; //p转成黑色
+           }
+           else  //BB-2B，需要上溯
+           {
+               //p保持黑色，高度减一
+               p->height--;
+               solveDoubleBlack(p); //递归上溯
+           }
+       }
+    }
+    else //如果兄弟是红色的，BB-3
+    {
+        //转换成BB-1或者BB-2R的情况
+        s->color=RB_BLACK;p->color=RB_RED;
+        BinNodePosi(T) t=IsLChild(*s)?s->lc:s->rc; //取t与s同侧，用于旋转
+        _hot=p;FromParentTo(*p)=rotateAt(t);
+        solveDoubleBlack(r); //继续修正，只递归一次，因为p已经转为红色
+    }
+}
+
+template<typename T>
+BinNodePosi(T) RedBlack<T>::insert(const T &e)
+{
+    BinNodePosi(T) &x=search(e);
+    if(x) return x;
+    x=new BinNode<T> (e,_hot,NULL,NULL,-1); _size++;
+    solveDoubleRed(x);
+    return x?x:_hot->parent; //why?
+}
+
+template <typename T>
+bool RedBlack<T>::remove(const T &e)
+{
+    BinNodePosi(T) &x=search(e); if(!x) return false; //确保目标存在
+    BinNodePosi(T) r=removeAt(x,_hot); //r为实际删除者的后继者
+    //此时hot已经变为实际删除者的父亲
+    if(!(--_size)) return true;
+    if(_hot) //若刚被删除的点是根节点，则将其置黑，并更新根节点的黑高度
+    {
+        _root->color=RB_BLACK; updateHeight(_root); return true;
+    }
+    if(BlackHeightUpdated(*_hot)) return true; //若所有的祖先的黑深度依旧平衡，则说明所删除的点是红节点，无需变动
+    if(IsRed(r)) //如果节点r是红色的，只需转成黑色的即可
+    {
+        r->color=RB_BLACK; r->height++; return true;
+    }
+    solveDoubleBlack(r); //否则需要进行双黑修正
+    return true;
+}

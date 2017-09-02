@@ -262,3 +262,54 @@ bool Splay<T>::remove(const T &e)
     return true;
 }
 
+
+//Red-Black Tree
+template<typename T>
+int RedBlack<T>::updateHeight(BinNode<T> *x)  //更新节点的黑高度
+{
+    x->height=max(stature(x->lc),stature(x->rc)); //孩子一般黑高度相等，除非出现双黑现象
+    return IsBlack(x)?x->height+1:x->height; //若当前节点为黑，则黑高度加1
+}
+
+//双红修正
+template<typename T>
+void RedBlack<T>::solveDoubleRed(BinNode<T> *x)  //解决双红问题
+{
+    if(IsRoot(*x)) //若已递归到树根，则将其转黑，整树黑高度增一
+    {
+        _root->color=RB_BLACK; _root->height++;
+         return ;
+    }
+    BinNodePosi(T) p=x->parent; if(IsBlack(p)) return; //若父节点为黑，则可以终止调整
+    BinNodePosi(T) g=p->parent; //既然p为红，则可知x的祖父必然存在，且一定为黑色
+    BinNodePosi(T) u=uncle(x); //u为x的叔父
+    //分两种情况讨论
+    if(IsBlack(u)) //若叔父u为黑色
+    {
+        //旋转并染色，不用上升
+        if(IsLChild(*x)==IsLChild(*p)) //若x与p同侧，zig-zig||zag-zag
+        {
+            //即p在中间，染成黑色，x和g在两侧，染成红色
+            p->color=RB_BLACK;
+        }
+        else //否则，异侧，zig-zag||zag-zig
+        {
+            //即x在中间，染成黑色，p和g在两侧，染成红色
+            x->color=RB_BLACK;
+        }
+        g->color=RB_RED; //g的颜色必定染成红色
+        BinNodePosi(T) gg=g->parent; //x的曾祖父
+        BinNodePosi(T) r=FromParentTo(*g)=rotateAt(x); //旋转接入
+        r->parent=gg;
+    }
+    else //若u为红色
+    {
+        p->color=RB_BLACK; p->height++;
+        u->color=RB_BLACK; u->height++;
+        if(!IsRoot(*g)) g->color=RB_RED; //若g非根，则转红
+        solveDoubleRed(g); //继续调整
+    }
+}
+
+//双黑修正
+//template<typename T>
